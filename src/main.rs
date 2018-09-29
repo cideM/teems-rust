@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate serde_derive;
+extern crate dirs;
 extern crate clap;
 extern crate serde;
 extern crate serde_json;
@@ -61,15 +62,15 @@ struct Dispatcher {
 }
 
 impl Dispatcher {
-    fn run(&self, app_config: &str, theme: &Theme) {
+    fn run(&self, theme: &Theme) {
         for x in &self.apps {
-            x.replace(app_config, theme);
+            x.replace(theme);
         }
     }
 }
 
 trait Replacer {
-    fn replace(&self, app_config: &str, theme: &Theme) -> Result<Vec<String>, TeemsError>;
+    fn replace(&self, theme: &Theme) -> Result<Vec<String>, TeemsError>;
 
     fn name(&self) -> &str;
 
@@ -91,7 +92,7 @@ impl Alacritty {
 }
 
 impl Replacer for Alacritty {
-    fn replace(&self, _app_config: &str, _theme: &Theme) -> Result<Vec<String>, TeemsError> {
+    fn replace(&self, _theme: &Theme) -> Result<Vec<String>, TeemsError> {
         let mut result = Vec::new();
 
         for path in &self.config_paths {
@@ -123,7 +124,12 @@ fn list_themes(config: &Config) -> () {
 
 fn main() {
     // TODO: Initialize dispatcher and call run() in 'activate' branch
-    let alacritty = Alacritty::new("alacritty", vec![]);
+    let config_dir = dirs::config_dir().unwrap();
+    let config_dir = config_dir.to_str().unwrap();
+
+    let alacritty = Alacritty::new("alacritty", vec![
+        format!("{}/alacritty/alacritty.yaml", config_dir),
+    ]);
 
     let app = App::new("Teems")
         .version("0.1")
@@ -161,21 +167,14 @@ fn main() {
                     .value_of("theme")
                     .expect("Could not read 'theme' argument");
 
-                let theme = match cfg.into_iter().find(|x: &Theme| x.name == theme_name) {
-                    Some(t) => t,
-                    None => {
-                        eprintln!("Theme {} not found in config file", theme_name);
-                        process::exit(1);
-                    }
-                };
+                let theme = cfg
+                    .into_iter()
+                    .find(|x: &Theme| x.name == theme_name)
+                    .expect(&format!("Theme {} not found in config file", theme_name));
 
-                let result = match alacritty.replace("foo", &theme) {
-                    Ok(r) => r,
-                    Err(_) => {
-                        eprintln!("Error generating new app config");
-                        process::exit(1);
-                    }
-                };
+                let result = alacritty
+                    .replace(&theme)
+                    .expect("Error generating new app config");
 
                 println!("{:?}", result);
             }

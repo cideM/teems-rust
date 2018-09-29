@@ -5,7 +5,8 @@ authors = ["Florian Beeres <fbeeres@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-clap = "*"
-serde = "*"
-serde_derive = "*"
-serde_json = "*"
+clap = "2.32.0"
+serde = "1.0.79"
+dirs = "1.0.4"
+serde_derive = "1.0.79"
+serde_json = "1.0.31"
