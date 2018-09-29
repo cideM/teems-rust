@@ -64,13 +64,13 @@ struct Dispatcher {
 impl Dispatcher {
     fn run(&self, theme: &Theme) {
         for x in &self.apps {
-            x.replace(theme);
+            x.convert_colors(theme);
         }
     }
 }
 
 trait Replacer {
-    fn replace(&self, theme: &Theme) -> Result<Vec<String>, TeemsError>;
+    fn convert_colors(&self, theme: &Theme) -> Result<Vec<String>, TeemsError>;
 
     fn name(&self) -> &str;
 
@@ -92,7 +92,7 @@ impl Alacritty {
 }
 
 impl Replacer for Alacritty {
-    fn replace(&self, _theme: &Theme) -> Result<Vec<String>, TeemsError> {
+    fn convert_colors(&self, _theme: &Theme) -> Result<Vec<String>, TeemsError> {
         let mut result = Vec::new();
 
         for path in &self.config_paths {
@@ -173,7 +173,7 @@ fn main() {
                     .expect(&format!("Theme {} not found in config file", theme_name));
 
                 let result = alacritty
-                    .replace(&theme)
+                    .convert_colors(&theme)
                     .expect("Error generating new app config");
 
                 println!("{:?}", result);
