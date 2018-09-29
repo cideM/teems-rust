@@ -91,11 +91,11 @@ impl Alacritty {
 }
 
 impl Replacer for Alacritty {
-    fn replace(&self, app_config: &str, theme: &Theme) -> Result<Vec<String>, TeemsError> {
+    fn replace(&self, _app_config: &str, _theme: &Theme) -> Result<Vec<String>, TeemsError> {
         let mut result = Vec::new();
 
         for path in &self.config_paths {
-            let content = match fs::read_to_string(path) {
+            let _content = match fs::read_to_string(path) {
                 Ok(x) => {
                     result.push(x);
                 }
