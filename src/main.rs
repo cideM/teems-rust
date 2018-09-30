@@ -1,135 +1,29 @@
-#[macro_use]
+extern crate teems_rust;
 extern crate serde_derive;
-extern crate dirs;
 extern crate clap;
+extern crate dirs;
 extern crate serde;
 extern crate serde_json;
 
 use clap::{App, Arg, SubCommand};
-use std::collections::HashMap;
-use std::convert::AsRef;
-use std::fmt;
+use teems_rust::Theme;
+use teems_rust::Dispatcher;
+use teems_rust::Alacritty;
 use std::fs;
-use std::process;
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Theme {
-    name: String,
-    colors: HashMap<String, String>,
-}
-
-impl fmt::Display for Theme {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut output = String::new();
-
-        output.push_str(&format!("Name: {}\n", &self.name));
-        output.push_str("Colors:\n");
-
-        for (color, value) in &self.colors {
-            output.push_str(&format!("\t0: {}: {}", color, value));
-        }
-
-        output.push_str("\n");
-        output.push_str("\n");
-
-        write!(f, "{}", output)
-    }
-}
-
-#[derive(Debug, Clone)]
-struct TeemsError {
-    msg: String,
-}
-
-impl TeemsError {
-    fn new(msg: &str) -> TeemsError {
-        TeemsError {
-            msg: msg.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for TeemsError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Error: {}", self.msg)
-    }
-}
-
-type Config = Vec<Theme>;
-
-struct Dispatcher {
-    apps: Vec<Box<Replacer>>,
-}
-
-impl Dispatcher {
-    fn run(&self, theme: &Theme) {
-        for x in &self.apps {
-            x.convert_colors(theme);
-        }
-    }
-}
-
-trait Replacer {
-    fn convert_colors(&self, theme: &Theme) -> Result<Vec<String>, TeemsError>;
-
-    fn name(&self) -> &str;
-
-    fn config_paths(&self) -> Vec<&str>;
-}
-
-struct Alacritty {
-    name: String,
-    config_paths: Vec<String>,
-}
-
-impl Alacritty {
-    fn new(name: &str, config_paths: Vec<String>) -> Alacritty {
-        Alacritty {
-            name: name.to_owned(),
-            config_paths,
-        }
-    }
-}
-
-impl Replacer for Alacritty {
-    fn convert_colors(&self, _theme: &Theme) -> Result<Vec<String>, TeemsError> {
-        let mut result = Vec::new();
-
-        for path in &self.config_paths {
-            let _content = match fs::read_to_string(path) {
-                Ok(x) => {
-                    result.push(x);
-                }
-                Err(e) => return Err(TeemsError::new(&format!("{}", e))),
-            };
-        }
-
-        Ok(result)
-    }
-
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn config_paths(&self) -> Vec<&str> {
-        self.config_paths.iter().map(AsRef::as_ref).collect()
-    }
-}
-
-fn list_themes(config: &Config) -> () {
-    for theme in config {
-        println!("{}", theme);
-    }
-}
 
 fn main() {
-    // TODO: Initialize dispatcher and call run() in 'activate' branch
-    let config_dir = dirs::config_dir().unwrap();
-    let config_dir = config_dir.to_str().unwrap();
+    // Does anyone really use MacOS actual config dir in Library/Preferences?
+    let home_dir = dirs::home_dir().unwrap();
+    let config_dir_linux = format!("{}/.config", home_dir.to_str().unwrap());
 
-    let alacritty = Alacritty::new("alacritty", vec![
-        format!("{}/alacritty/alacritty.yaml", config_dir),
-    ]);
+    let alacritty = Alacritty::new(
+        "alacritty",
+        vec![format!("{}/alacritty/alacritty.yml", config_dir_linux)],
+    );
+
+    let dispatcher = Dispatcher {
+        apps: vec![Box::new(alacritty)],
+    };
 
     let app = App::new("Teems")
         .version("0.1")
@@ -160,7 +54,7 @@ fn main() {
     match config_deserialized {
         Ok(cfg) => match matches.subcommand() {
             ("list", _) => {
-                list_themes(&cfg);
+                teems_rust::list_themes(&cfg);
             }
             ("activate", Some(sub)) => {
                 let theme_name = sub
@@ -172,15 +66,11 @@ fn main() {
                     .find(|x: &Theme| x.name == theme_name)
                     .expect(&format!("Theme {} not found in config file", theme_name));
 
-                let result = alacritty
-                    .convert_colors(&theme)
-                    .expect("Error generating new app config");
-
-                println!("{:?}", result);
+                dispatcher.run(&theme);
             }
             _ => {
                 // Default if no subcommand matched
-                list_themes(&cfg);
+                teems_rust::list_themes(&cfg);
             }
         },
         Err(_) => println!("Could not deserialize config file"),
