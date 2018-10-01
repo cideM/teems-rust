@@ -90,22 +90,22 @@ impl Alacritty {
 
 fn alacritty_color_to_theme_color(c: &str, normal_colors: bool) -> &str {
     match c {
-        "black" if normal_colors == true => "color0",
-        "black" if normal_colors == false => "color8",
-        "red" if normal_colors == true => "color1",
-        "red" if normal_colors == false => "color9",
-        "green" if normal_colors == true => "color2",
-        "green" if normal_colors == false => "color10",
-        "yellow" if normal_colors == true => "color3",
-        "yellow" if normal_colors == false => "color11",
-        "blue" if normal_colors == true => "color4",
-        "blue" if normal_colors == false => "color12",
-        "magenta" if normal_colors == true => "color5",
-        "magenta" if normal_colors == false => "color13",
-        "cyan" if normal_colors == true => "color6",
-        "cyan" if normal_colors == false => "color14",
-        "white" if normal_colors == true => "color7",
-        "white" if normal_colors == false => "color15",
+        "black" if normal_colors => "color0",
+        "black" if !normal_colors => "color8",
+        "red" if normal_colors => "color1",
+        "red" if !normal_colors => "color9",
+        "green" if normal_colors => "color2",
+        "green" if !normal_colors => "color10",
+        "yellow" if normal_colors => "color3",
+        "yellow" if !normal_colors => "color11",
+        "blue" if normal_colors => "color4",
+        "blue" if !normal_colors => "color12",
+        "magenta" if normal_colors => "color5",
+        "magenta" if !normal_colors => "color13",
+        "cyan" if normal_colors => "color6",
+        "cyan" if !normal_colors => "color14",
+        "white" if normal_colors => "color7",
+        "white" if !normal_colors => "color15",
         "foreground" => "foreground",
         "background" => "background",
         _ => "color0",
@@ -183,7 +183,7 @@ impl Replacer for Alacritty {
     }
 }
 
-pub fn list_themes(config: &Config) -> () {
+pub fn list_themes(config: Config) -> () {
     for theme in config {
         println!("{}", theme);
     }
@@ -218,12 +218,10 @@ mod tests {
             .cloned()
             .collect();
 
-        let t = Theme {
+        Theme {
             name: String::from("theme"),
             colors: c,
-        };
-
-        t
+        }
     }
 
     #[test]

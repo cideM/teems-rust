@@ -54,7 +54,7 @@ fn main() {
     match config_deserialized {
         Ok(cfg) => match matches.subcommand() {
             ("list", _) => {
-                teems_rust::list_themes(&cfg);
+                teems_rust::list_themes(cfg);
             }
             ("activate", Some(sub)) => {
                 let theme_name = sub
@@ -68,12 +68,12 @@ fn main() {
 
                 match dispatcher.run(&theme) {
                     Err(msg) => println!("Error: {}", msg),
-                    _ => {}
+                    _ => println!("Done!"),
                 };
             }
             _ => {
                 // Default if no subcommand matched
-                teems_rust::list_themes(&cfg);
+                teems_rust::list_themes(cfg);
             }
         },
         Err(_) => println!("Could not deserialize config file"),
