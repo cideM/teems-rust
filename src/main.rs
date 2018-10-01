@@ -1,15 +1,15 @@
-extern crate teems_rust;
-extern crate serde_derive;
 extern crate clap;
 extern crate dirs;
 extern crate serde;
+extern crate serde_derive;
 extern crate serde_json;
+extern crate teems_rust;
 
 use clap::{App, Arg, SubCommand};
-use teems_rust::Theme;
-use teems_rust::Dispatcher;
-use teems_rust::Alacritty;
 use std::fs;
+use teems_rust::Alacritty;
+use teems_rust::Dispatcher;
+use teems_rust::Theme;
 
 fn main() {
     // Does anyone really use MacOS actual config dir in Library/Preferences?
@@ -66,7 +66,10 @@ fn main() {
                     .find(|x: &Theme| x.name == theme_name)
                     .expect(&format!("Theme {} not found in config file", theme_name));
 
-                dispatcher.run(&theme);
+                match dispatcher.run(&theme) {
+                    Err(msg) => println!("Error: {}", msg),
+                    _ => {}
+                };
             }
             _ => {
                 // Default if no subcommand matched

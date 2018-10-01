@@ -1,10 +1,14 @@
 #[macro_use]
 extern crate serde_derive;
+extern crate failure;
 extern crate regex;
 
+#[macro_use]
+extern crate failure_derive;
+
+use failure::Error;
 use regex::Captures;
 use regex::Regex;
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::AsRef;
 use std::fmt;
@@ -24,7 +28,7 @@ impl fmt::Display for Theme {
         output.push_str("Colors:\n");
 
         for (color, value) in &self.colors {
-            output.push_str(&format!("\t0: {}: {}", color, value));
+            output.push_str(&format!("\t: {}: {}", color, value));
         }
 
         output.push_str("\n");
@@ -34,24 +38,10 @@ impl fmt::Display for Theme {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct TeemsError<'a> {
-    pub msg: Cow<'a, str>,
-}
-
-impl<'a> TeemsError<'a> {
-    fn new<T>(msg: T) -> TeemsError<'a>
-    where
-        T: Into<Cow<'a, str>>,
-    {
-        TeemsError { msg: msg.into() }
-    }
-}
-
-impl<'a> fmt::Display for TeemsError<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Error: {}", self.msg)
-    }
+#[derive(Debug, Fail)]
+pub enum AppError {
+    #[fail(display = "Error during color conversion: {}", msg)]
+    ConversionError { msg: String },
 }
 
 type Config = Vec<Theme>;
@@ -61,24 +51,23 @@ pub struct Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn run(&self, theme: &Theme) -> Vec<Result<String, TeemsError>> {
-        let mut results = Vec::new();
-
-        for a in &self.apps {
-            for path in a.config_paths() {
-                match fs::read_to_string(path) {
-                    Ok(app_config) => results.push(a.convert_colors(theme, &app_config)),
-                    Err(e) => results.push(Err(TeemsError::new(format!("{}", e)))),
-                }
+    pub fn run(&self, theme: &Theme) -> Result<(), Error> {
+        for app in &self.apps {
+            for path in app.config_paths() {
+                let app_config = fs::read_to_string(path)?;
+                app.convert_colors(theme, &app_config)?;
+                // TODO: Write to fs
+                // TODO: Think about what to return from this. Vec of strings written? Tuple of app name and strings?
+                println!("done!");
             }
         }
 
-        results
+        Ok(())
     }
 }
 
 pub trait Replacer {
-    fn convert_colors(&self, theme: &Theme, app_config: &str) -> Result<String, TeemsError>;
+    fn convert_colors(&self, theme: &Theme, app_config: &str) -> Result<String, Error>;
 
     fn name(&self) -> &str;
 
@@ -124,20 +113,28 @@ fn alacritty_color_to_theme_color(c: &str, normal_colors: bool) -> &str {
 }
 
 impl Replacer for Alacritty {
-    fn convert_colors(&self, theme: &Theme, app_config: &str) -> Result<String, TeemsError> {
-        let re_bright = Regex::new(r"^\s*bright:").unwrap();
-        let re_normal = Regex::new(r"^\s*normal:").unwrap();
+    fn convert_colors(&self, theme: &Theme, app_config: &str) -> Result<String, Error> {
+        let re_bright = Regex::new(r"^\s*bright:")?;
+        let re_normal = Regex::new(r"^\s*normal:")?;
         let re_line_with_color = Regex::new(
             r"(?x)
                ^
                (?P<leading>\s*)
-               (?P<color_name>black|red|green|yellow|blue|magenta|cyan|white|foreground|background)
+               (?P<color_name>black
+                 |red
+                 |green
+                 |yellow
+                 |blue
+                 |magenta
+                 |cyan
+                 |white
+                 |foreground
+                 |background)
                (?P<middle>:\s*'0x)
                (?P<color_value>\w{6})
                (?P<trailing>'.*)
             ",
-        )
-        .unwrap();
+        )?;
 
         let mut normal_colors = false;
         let mut results = vec![];
@@ -170,6 +167,7 @@ impl Replacer for Alacritty {
                     )
                 })
                 .to_string();
+
             results.push(after);
         }
 
@@ -195,13 +193,7 @@ pub fn list_themes(config: &Config) -> () {
 mod tests {
     use super::*;
 
-    #[test]
-    fn it_replaces_bright_colors_in_alacritty() {
-        let a = Alacritty {
-            name: String::from("Alacritty"),
-            config_paths: vec![],
-        };
-
+    fn get_theme() -> Theme {
         let c: HashMap<String, String> = [
             (String::from("color0"), String::from("#000000")),
             (String::from("color1"), String::from("#111111")),
@@ -230,6 +222,18 @@ mod tests {
             name: String::from("theme"),
             colors: c,
         };
+
+        t
+    }
+
+    #[test]
+    fn it_replaces_bright_colors_in_alacritty() {
+        let a = Alacritty {
+            name: String::from("Alacritty"),
+            config_paths: vec![],
+        };
+
+        let theme = get_theme();
 
         let cfg = "
         background:     '0x2E3440'
@@ -283,7 +287,32 @@ mod tests {
             white:       '0x151515'
         ";
 
-        let result = a.convert_colors(&t, &cfg).unwrap();
+        let result = a.convert_colors(&theme, &cfg).unwrap();
         assert_eq!(result, cfg_expected);
+    }
+
+    #[test]
+    fn it_keeps_formatting() {
+        let a = Alacritty {
+            name: String::from("Alacritty"),
+            config_paths: vec![],
+        };
+
+        let theme = get_theme();
+
+        let cfg = "
+            normal:
+                black: '0x123456'
+                red:         '0x123456'
+        ";
+
+        let expected = "
+            normal:
+                black: '0x000000'
+                red:         '0x111111'
+        ";
+
+        let result = a.convert_colors(&theme, &cfg).unwrap();
+        assert_eq!(result, expected);
     }
 }
