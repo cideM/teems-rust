@@ -53,15 +53,17 @@ pub struct Dispatcher {
 impl Dispatcher {
     pub fn run(&self, theme: &Theme) -> () {
         for app in &self.apps {
+            let name = app.name();
+
+            println!("App: {}", name);
+
             for path in app.config_paths() {
                 let config = match fs::read_to_string(path) {
                     Ok(c) => c,
                     Err(e) => {
                         println!(
                             "Error reading configuration file {} for app {}: {}",
-                            path,
-                            app.name(),
-                            e
+                            path, name, e
                         );
                         break;
                     }
@@ -70,14 +72,14 @@ impl Dispatcher {
                 let new_config = match app.convert_colors(theme, &config) {
                     Ok(c) => c,
                     Err(e) => {
-                        println!("Error converting colors for app {}: {}", app.name(), e);
+                        println!("Error converting colors for app {}: {}", name, e);
                         break;
                     }
                 };
 
                 match fs::write(path, new_config) {
-                    Ok(_) => println!("Yay"),
-                    Err(e) => println!("Error in app {}: {}", app.name(), e),
+                    Err(e) => println!("Error in app {}: {}", name, e),
+                    Ok(_) => println!("Converted colors for {} in {}", name, path),
                 };
             }
         }
