@@ -64,12 +64,9 @@ fn main() {
                 let theme = cfg
                     .into_iter()
                     .find(|x: &Theme| x.name == theme_name)
-                    .expect(&format!("Theme {} not found in config file", theme_name));
+                    .unwrap_or_else(|| panic!("Theme {} not found in config file", theme_name));
 
-                match dispatcher.run(&theme) {
-                    Err(msg) => println!("Error: {}", msg),
-                    _ => println!("Done!"),
-                };
+                dispatcher.run(&theme);
             }
             _ => {
                 // Default if no subcommand matched

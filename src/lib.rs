@@ -51,18 +51,36 @@ pub struct Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn run(&self, theme: &Theme) -> Result<(), Error> {
+    pub fn run(&self, theme: &Theme) -> () {
         for app in &self.apps {
             for path in app.config_paths() {
-                let app_config = fs::read_to_string(path)?;
-                app.convert_colors(theme, &app_config)?;
-                // TODO: Write to fs
-                // TODO: Think about what to return from this. Vec of strings written? Tuple of app name and strings?
-                println!("done!");
+                let config = match fs::read_to_string(path) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        println!(
+                            "Error reading configuration file {} for app {}: {}",
+                            path,
+                            app.name(),
+                            e
+                        );
+                        break;
+                    }
+                };
+
+                let new_config = match app.convert_colors(theme, &config) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        println!("Error converting colors for app {}: {}", app.name(), e);
+                        break;
+                    }
+                };
+
+                match fs::write(path, new_config) {
+                    Ok(_) => println!("Yay"),
+                    Err(e) => println!("Error in app {}: {}", app.name(), e),
+                };
             }
         }
-
-        Ok(())
     }
 }
 
@@ -88,24 +106,24 @@ impl Alacritty {
     }
 }
 
-fn alacritty_color_to_theme_color(c: &str, normal_colors: bool) -> &str {
+fn alacritty_color_to_theme_color(c: &str, is_normal_block: bool) -> &str {
     match c {
-        "black" if normal_colors => "color0",
-        "black" if !normal_colors => "color8",
-        "red" if normal_colors => "color1",
-        "red" if !normal_colors => "color9",
-        "green" if normal_colors => "color2",
-        "green" if !normal_colors => "color10",
-        "yellow" if normal_colors => "color3",
-        "yellow" if !normal_colors => "color11",
-        "blue" if normal_colors => "color4",
-        "blue" if !normal_colors => "color12",
-        "magenta" if normal_colors => "color5",
-        "magenta" if !normal_colors => "color13",
-        "cyan" if normal_colors => "color6",
-        "cyan" if !normal_colors => "color14",
-        "white" if normal_colors => "color7",
-        "white" if !normal_colors => "color15",
+        "black" if is_normal_block => "color0",
+        "black" if !is_normal_block => "color8",
+        "red" if is_normal_block => "color1",
+        "red" if !is_normal_block => "color9",
+        "green" if is_normal_block => "color2",
+        "green" if !is_normal_block => "color10",
+        "yellow" if is_normal_block => "color3",
+        "yellow" if !is_normal_block => "color11",
+        "blue" if is_normal_block => "color4",
+        "blue" if !is_normal_block => "color12",
+        "magenta" if is_normal_block => "color5",
+        "magenta" if !is_normal_block => "color13",
+        "cyan" if is_normal_block => "color6",
+        "cyan" if !is_normal_block => "color14",
+        "white" if is_normal_block => "color7",
+        "white" if !is_normal_block => "color15",
         "foreground" => "foreground",
         "background" => "background",
         _ => "color0",
@@ -136,33 +154,33 @@ impl Replacer for Alacritty {
             ",
         )?;
 
-        let mut normal_colors = false;
+        let mut is_normal_block = false;
         let mut results = vec![];
 
         for line in app_config.lines() {
             if re_bright.is_match(line) {
-                normal_colors = false;
+                is_normal_block = false;
             }
 
             if re_normal.is_match(line) {
-                normal_colors = true;
+                is_normal_block = true;
             }
 
             let after = re_line_with_color
                 .replace_all(line, |caps: &Captures| {
                     let theme_color_name =
-                        alacritty_color_to_theme_color(&caps["color_name"], normal_colors);
+                        alacritty_color_to_theme_color(&caps["color_name"], is_normal_block);
 
                     format!(
                         "{}{}{}{}{}",
                         &caps["leading"],
                         &caps["color_name"],
                         &caps["middle"],
-                        // Remove # from color
-                        &theme.colors.get(theme_color_name).expect(&format!(
-                            "Could not find color {} in theme.",
-                            theme_color_name
-                        ))[1..],
+                        &theme
+                            .colors
+                            // Use existing color value if theme doesn't have a replacement
+                            .get(theme_color_name)
+                            .unwrap_or(&caps["color_value"].to_string())[1..], // Remove # from color
                         &caps["trailing"]
                     )
                 })
@@ -185,7 +203,7 @@ impl Replacer for Alacritty {
 
 pub fn list_themes(config: Config) -> () {
     for theme in config {
-        println!("{}", theme);
+        println!("{}", theme.name);
     }
 }
 
