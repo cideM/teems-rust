@@ -1,22 +1,13 @@
-extern crate clap;
-extern crate dirs;
-extern crate serde;
-extern crate serde_derive;
-extern crate serde_json;
-extern crate teems_rust;
-
 use clap::{App, Arg, SubCommand};
 use std::fs;
-use teems_rust::Alacritty;
-use teems_rust::Dispatcher;
-use teems_rust::Theme;
+use teems_rust::{apps, Dispatcher, Theme};
 
 fn main() {
     // Does anyone really use MacOS actual config dir in Library/Preferences?
     let home_dir = dirs::home_dir().unwrap();
     let config_dir_linux = format!("{}/.config", home_dir.to_str().unwrap());
 
-    let alacritty = Alacritty::new(
+    let alacritty = alacritty::Alacritty::new(
         "alacritty",
         vec![format!("{}/alacritty/alacritty.yml", config_dir_linux)],
     );
