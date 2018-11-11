@@ -7,7 +7,7 @@ fn main() {
     let home_dir = dirs::home_dir().unwrap();
     let config_dir_linux = format!("{}/.config", home_dir.to_str().unwrap());
 
-    let alacritty = alacritty::Alacritty::new(
+    let alacritty = apps::alacritty::Alacritty::new(
         "alacritty",
         vec![format!("{}/alacritty/alacritty.yml", config_dir_linux)],
     );
