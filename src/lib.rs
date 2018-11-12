@@ -1,4 +1,5 @@
 pub mod apps;
+
 use failure::Error;
 use failure_derive::Fail;
 use serde_derive::{Deserialize, Serialize};
