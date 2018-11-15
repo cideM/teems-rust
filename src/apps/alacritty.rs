@@ -19,34 +19,44 @@ impl Alacritty {
     }
 }
 
-fn alacritty_color_to_theme_color(c: &str, is_normal_block: bool) -> &str {
-    match c {
-        "black" if is_normal_block => "color0",
-        "black" if !is_normal_block => "color8",
-        "red" if is_normal_block => "color1",
-        "red" if !is_normal_block => "color9",
-        "green" if is_normal_block => "color2",
-        "green" if !is_normal_block => "color10",
-        "yellow" if is_normal_block => "color3",
-        "yellow" if !is_normal_block => "color11",
-        "blue" if is_normal_block => "color4",
-        "blue" if !is_normal_block => "color12",
-        "magenta" if is_normal_block => "color5",
-        "magenta" if !is_normal_block => "color13",
-        "cyan" if is_normal_block => "color6",
-        "cyan" if !is_normal_block => "color14",
-        "white" if is_normal_block => "color7",
-        "white" if !is_normal_block => "color15",
-        "foreground" => "foreground",
-        "background" => "background",
-        _ => "color0",
+fn alacritty_color_to_theme_color<'a>(c: &'a str, mode: &Mode) -> &'a str {
+    match mode {
+        Mode::Normal => match c {
+            "black" => "color0",
+            "red" => "color1",
+            "green" => "color2",
+            "yellow" => "color3",
+            "blue" => "color4",
+            "magenta" => "color5",
+            "cyan" => "color6",
+            "white" => "color7",
+            "foreground" => "foreground",
+            "background" => "background",
+            _ => "color0",
+        },
+        Mode::Bright => match c {
+            "black" => "color8",
+            "red" => "color9",
+            "green" => "color10",
+            "yellow" => "color11",
+            "blue" => "color12",
+            "magenta" => "color13",
+            "cyan" => "color14",
+            "white" => "color15",
+            "foreground" => "foreground",
+            "background" => "background",
+            _ => "color0",
+        },
     }
+}
+
+enum Mode {
+    Bright,
+    Normal,
 }
 
 impl Replacer for Alacritty {
     fn convert_colors(&self, theme: &Theme, app_config: &str) -> Result<String, Error> {
-        let re_bright = Regex::new(r"^\s*bright:")?;
-        let re_normal = Regex::new(r"^\s*normal:")?;
         let re_line_with_color = Regex::new(
             r"(?x)
                ^
@@ -67,22 +77,22 @@ impl Replacer for Alacritty {
             ",
         )?;
 
-        let mut is_normal_block = false;
+        let mut mode = Mode::Normal;
         let mut results = vec![];
 
         for line in app_config.lines() {
-            if re_bright.is_match(line) {
-                is_normal_block = false;
-            }
+            let trimmed = line.trim_start();
 
-            if re_normal.is_match(line) {
-                is_normal_block = true;
+            if trimmed.starts_with("bright:") {
+                mode = Mode::Bright;
+            } else if trimmed.starts_with("normal:") {
+                mode = Mode::Normal;
             }
 
             let after = re_line_with_color
                 .replace_all(line, |caps: &Captures| {
                     let theme_color_name =
-                        alacritty_color_to_theme_color(&caps["color_name"], is_normal_block);
+                        alacritty_color_to_theme_color(&caps["color_name"], &mode);
 
                     format!(
                         "{}{}{}{}{}",
@@ -211,6 +221,7 @@ mod tests {
             blue:        '0x121212'
             magenta:     '0x131313'
             cyan:        '0x141414'
+            white:       '0x151515'
         ";
 
         let result = a.convert_colors(&theme, &cfg).unwrap();
