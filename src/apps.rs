@@ -1,2 +1,1 @@
-mod alacritty;
-pub use self::alacritty::Alacritty;
+pub mod alacritty;

@@ -1,23 +1,7 @@
-use crate::Replacer;
-use crate::Theme;
+use crate::{ColorValue, Hexable, Theme};
 use failure::Error;
 use regex::Captures;
 use regex::Regex;
-use std::convert::AsRef;
-
-pub struct Alacritty {
-    name: String,
-    config_paths: Vec<String>,
-}
-
-impl Alacritty {
-    pub fn new(name: &str, config_paths: Vec<String>) -> Alacritty {
-        Alacritty {
-            name: name.to_owned(),
-            config_paths,
-        }
-    }
-}
 
 fn alacritty_color_to_theme_color<'a>(c: &'a str, mode: &Mode) -> &'a str {
     match mode {
@@ -55,105 +39,121 @@ enum Mode {
     Normal,
 }
 
-impl Replacer for Alacritty {
-    fn convert_colors(&self, theme: &Theme, app_config: &str) -> Result<String, Error> {
-        let re_line_with_color = Regex::new(
-            r"(?x)
-               ^
-               (?P<leading>\s*)
-               (?P<color_name>black
-                 |red
-                 |green
-                 |yellow
-                 |blue
-                 |magenta
-                 |cyan
-                 |white
-                 |foreground
-                 |background)
-               (?P<middle>:\s*'0x)
-               (?P<color_value>\w{6})
-               (?P<trailing>'.*)
-            ",
-        )?;
+pub fn convert_colors(theme: &Theme, app_config: &str) -> Result<String, Error> {
+    let re_line_with_color = Regex::new(
+        r"(?x)
+            ^
+            (?P<leading>\s*)
+            (?P<color_name>black
+                |red
+                |green
+                |yellow
+                |blue
+                |magenta
+                |cyan
+                |white
+                |foreground
+                |background)
+            (?P<middle>:\s*'0x)
+            (?P<color_value>\w{6})
+            (?P<trailing>'.*)
+        ",
+    )?;
 
-        let mut mode = Mode::Normal;
-        let mut results = vec![];
+    let mut mode = Mode::Normal;
+    let mut results = vec![];
 
-        for line in app_config.lines() {
-            let trimmed = line.trim_start();
+    for line in app_config.lines() {
+        let trimmed = line.trim_start();
 
-            if trimmed.starts_with("bright:") {
-                mode = Mode::Bright;
-            } else if trimmed.starts_with("normal:") {
-                mode = Mode::Normal;
-            }
-
-            let after = re_line_with_color
-                .replace_all(line, |caps: &Captures| {
-                    let theme_color_name =
-                        alacritty_color_to_theme_color(&caps["color_name"], &mode);
-
-                    format!(
-                        "{}{}{}{}{}",
-                        &caps["leading"],
-                        &caps["color_name"],
-                        &caps["middle"],
-                        &theme
-                            .colors
-                            // Use existing color value if theme doesn't have a replacement
-                            .get(theme_color_name)
-                            .unwrap_or(&caps["color_value"].to_string())
-                            .replace("#", ""),
-                        &caps["trailing"]
-                    )
-                })
-                .to_string();
-
-            results.push(after);
+        if trimmed.starts_with("bright:") {
+            mode = Mode::Bright;
+        } else if trimmed.starts_with("normal:") {
+            mode = Mode::Normal;
         }
 
-        Ok(results.join("\n"))
+        let after = re_line_with_color
+            .replace_all(line, |caps: &Captures| {
+                let theme_color_name = alacritty_color_to_theme_color(&caps["color_name"], &mode);
+
+                format!(
+                    "{}{}{}{}{}",
+                    &caps["leading"],
+                    &caps["color_name"],
+                    &caps["middle"],
+                    &theme
+                        .colors
+                        // Use existing color value if theme doesn't have a replacement
+                        .get(theme_color_name)
+                        .and_then(|c| match c {
+                            ColorValue::RGBA(r) => Some(r.to_hex()),
+                        })
+                        .unwrap_or_else(|| caps["color_value"].to_string())
+                        .replace("#", ""),
+                    &caps["trailing"]
+                )
+            })
+            .to_string();
+
+        results.push(after);
     }
 
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn config_paths(&self) -> Vec<&str> {
-        self.config_paths.iter().map(AsRef::as_ref).collect()
-    }
+    Ok(results.join("\n"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{ColorName, ColorValue, RGBA};
     use std::collections::HashMap;
 
     fn get_theme() -> Theme {
-        let c: HashMap<String, String> = [
-            (String::from("color0"), String::from("#000000")),
-            (String::from("color1"), String::from("#111111")),
-            (String::from("color2"), String::from("#222222")),
-            (String::from("color3"), String::from("#333333")),
-            (String::from("color4"), String::from("#444444")),
-            (String::from("color5"), String::from("#555555")),
-            (String::from("color6"), String::from("#666666")),
-            (String::from("color7"), String::from("#777777")),
-            (String::from("color8"), String::from("#888888")),
-            (String::from("color9"), String::from("#999999")),
-            (String::from("color10"), String::from("#101010")),
-            (String::from("color11"), String::from("#111111")),
-            (String::from("color12"), String::from("#121212")),
-            (String::from("color13"), String::from("#131313")),
-            (String::from("color14"), String::from("#141414")),
-            (String::from("color15"), String::from("#151515")),
-            (String::from("foreground"), String::from("#FFFFFF")),
-            (String::from("background"), String::from("#BBBBBB")),
+        let c: HashMap<ColorName, ColorValue> = vec![
+            (String::from("color0"), ColorValue::RGBA(RGBA(0, 0, 0, 1.0))),
+            (String::from("color1"), ColorValue::RGBA(RGBA(1, 1, 1, 1.0))),
+            (String::from("color2"), ColorValue::RGBA(RGBA(2, 2, 2, 1.0))),
+            (String::from("color3"), ColorValue::RGBA(RGBA(3, 3, 3, 1.0))),
+            (String::from("color4"), ColorValue::RGBA(RGBA(4, 4, 4, 1.0))),
+            (String::from("color5"), ColorValue::RGBA(RGBA(5, 5, 5, 1.0))),
+            (String::from("color6"), ColorValue::RGBA(RGBA(6, 6, 6, 1.0))),
+            (String::from("color7"), ColorValue::RGBA(RGBA(7, 7, 7, 1.0))),
+            (String::from("color8"), ColorValue::RGBA(RGBA(8, 8, 8, 1.0))),
+            (String::from("color9"), ColorValue::RGBA(RGBA(9, 9, 9, 1.0))),
+            (
+                String::from("color10"),
+                ColorValue::RGBA(RGBA(10, 10, 10, 1.0)),
+            ),
+            (
+                String::from("color11"),
+                ColorValue::RGBA(RGBA(11, 11, 11, 1.0)),
+            ),
+            (
+                String::from("color12"),
+                ColorValue::RGBA(RGBA(12, 12, 12, 1.0)),
+            ),
+            (
+                String::from("color13"),
+                ColorValue::RGBA(RGBA(13, 13, 13, 1.0)),
+            ),
+            (
+                String::from("color14"),
+                ColorValue::RGBA(RGBA(14, 14, 14, 1.0)),
+            ),
+            (
+                String::from("color15"),
+                ColorValue::RGBA(RGBA(15, 15, 15, 1.0)),
+            ),
+            (
+                String::from("foreground"),
+                ColorValue::RGBA(RGBA(255, 255, 255, 1.0)),
+            ),
+            (
+                String::from("background"),
+                ColorValue::RGBA(RGBA(50, 50, 50, 1.0)),
+            ),
         ]
-            .iter()
-            .cloned()
-            .collect();
+        .into_iter()
+        .collect();
 
         Theme {
             name: String::from("theme"),
@@ -163,11 +163,6 @@ mod tests {
 
     #[test]
     fn it_replaces_bright_colors_in_alacritty() {
-        let a = Alacritty {
-            name: String::from("Alacritty"),
-            config_paths: vec![],
-        };
-
         let theme = get_theme();
 
         let cfg = "
@@ -198,43 +193,38 @@ mod tests {
         ";
 
         let cfg_expected = "
-        background:     '0xBBBBBB'
-        foreground:     '0xFFFFFF'
+        background:     '0x323232'
+        foreground:     '0xffffff'
         
         normal:
             black:       '0x000000'
-            red:         '0x111111'
-            green:       '0x222222'
+            red:         '0x010101'
+            green:       '0x020202'
         #   green:       '0xA3BE8C'
-            yellow:      '0x333333'
-            blue:        '0x444444'
-            magenta:     '0x555555'
-            cyan:        '0x666666'
-            white:       '0x777777'
+            yellow:      '0x030303'
+            blue:        '0x040404'
+            magenta:     '0x050505'
+            cyan:        '0x060606'
+            white:       '0x070707'
 
         # Bright colors
         bright:
-            black:       '0x888888'
-            red:         '0x999999'
-            green:       '0x101010'
-            yellow:      '0x111111'
-            blue:        '0x121212'
-            magenta:     '0x131313'
-            cyan:        '0x141414'
-            white:       '0x151515'
+            black:       '0x080808'
+            red:         '0x090909'
+            green:       '0x0a0a0a'
+            yellow:      '0x0b0b0b'
+            blue:        '0x0c0c0c'
+            magenta:     '0x0d0d0d'
+            cyan:        '0x0e0e0e'
+            white:       '0x0f0f0f'
         ";
 
-        let result = a.convert_colors(&theme, &cfg).unwrap();
+        let result = convert_colors(&theme, &cfg).unwrap();
         assert_eq!(result, cfg_expected);
     }
 
     #[test]
     fn it_keeps_formatting() {
-        let a = Alacritty {
-            name: String::from("Alacritty"),
-            config_paths: vec![],
-        };
-
         let theme = get_theme();
 
         let cfg = "
@@ -249,7 +239,7 @@ mod tests {
                 red:         '0x111111'
         ";
 
-        let result = a.convert_colors(&theme, &cfg).unwrap();
+        let result = convert_colors(&theme, &cfg).unwrap();
         assert_eq!(result, expected);
     }
 }

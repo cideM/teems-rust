@@ -1,20 +1,16 @@
 use clap::{App, Arg, SubCommand};
 use std::fs;
-use teems_rust::{apps, Dispatcher, Theme};
+use std::path::PathBuf;
+use teems_rust::{apps, App as TermEmu, Theme};
 
 fn main() {
-    // Does anyone really use MacOS actual config dir in Library/Preferences?
-    let home_dir = dirs::home_dir().unwrap();
-    let config_dir_linux = format!("{}/.config", home_dir.to_str().unwrap());
-
-    let alacritty = apps::Alacritty::new(
-        "alacritty",
-        vec![format!("{}/alacritty/alacritty.yml", config_dir_linux)],
+    let alacritty = TermEmu::new(
+        String::from("alacritty"),
+        vec![PathBuf::from(r"alacritty/alacritty.yml")],
+        Box::new(apps::alacritty::convert_colors),
     );
 
-    let dispatcher = Dispatcher {
-        apps: vec![Box::new(alacritty)],
-    };
+    let apps = vec![alacritty];
 
     let app = App::new("Teems")
         .version("0.1")
@@ -48,6 +44,13 @@ fn main() {
                 teems_rust::list_themes(cfg);
             }
             ("activate", Some(sub)) => {
+                // TODO: Do it like above eith list_themes
+                let home_dir = dirs::home_dir().unwrap();
+                // config_dir is Library/Preferences on MacOS but I don't think anyone
+                // really stores configuration for e.g., terminal emulators there.
+                let config_dir_os = dirs::config_dir().unwrap();
+                let config_dir_linux = home_dir.join(".config");
+
                 let theme_name = sub
                     .value_of("theme")
                     .expect("Could not read 'theme' argument");
@@ -57,7 +60,42 @@ fn main() {
                     .find(|x: &Theme| x.name == theme_name)
                     .unwrap_or_else(|| panic!("Theme {} not found in config file", theme_name));
 
-                dispatcher.run(&theme);
+                for app in apps {
+                    println!("App: {}", app.name);
+
+                    let mut valid_paths: Vec<PathBuf> = app
+                        .config_paths
+                        .iter()
+                        .flat_map(|p| {
+                            vec![config_dir_linux.join(p), config_dir_os.join(p)].into_iter()
+                        })
+                        .filter(|p| p.exists())
+                        .collect();
+
+                    valid_paths.sort();
+                    valid_paths.dedup();
+
+                    for path in valid_paths {
+                        let config = fs::read_to_string(&path).unwrap_or_else(|_| {
+                            panic!(
+                                "Error reading configuration file {} for app {}.",
+                                path.display(),
+                                app.name
+                            )
+                        });
+
+                        let new_config = (app.mk_config)(&theme, &config).unwrap_or_else(|_| {
+                            panic!("Error converting colors for app {}.", app.name)
+                        });
+
+                        match fs::write(&path, new_config) {
+                            Err(e) => println!("Error in app {}: {}", app.name, e),
+                            Ok(_) => {
+                                println!("Converted colors for {} in {}", app.name, path.display())
+                            }
+                        };
+                    }
+                }
             }
             _ => {
                 // Default if no subcommand matched
