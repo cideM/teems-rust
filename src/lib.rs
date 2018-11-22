@@ -5,6 +5,7 @@ use failure_derive::Fail;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
+use std::fs;
 use std::path::PathBuf;
 
 type Hex = String;
@@ -99,4 +100,36 @@ pub fn list_themes(config: Config) -> () {
     for theme in config {
         println!("{}", theme.name);
     }
+}
+
+pub fn activate_theme(apps: Vec<App>, theme: &Theme) -> Result<(), Error> {
+    let home_dir = dirs::home_dir().unwrap();
+    // config_dir is Library/Preferences on MacOS but I don't think anyone
+    // really stores configuration for e.g., terminal emulators there.
+    let config_dir_os = dirs::config_dir().unwrap();
+    let config_dir_linux = home_dir.join(".config");
+
+    for app in apps {
+        let mut valid_paths: Vec<PathBuf> = app
+            .config_paths
+            .iter()
+            .flat_map(|p| vec![config_dir_linux.join(p), config_dir_os.join(p)].into_iter())
+            .filter(|p| p.exists())
+            .collect();
+
+        valid_paths.sort();
+        valid_paths.dedup();
+
+        for path in valid_paths {
+            let config = fs::read_to_string(&path)?;
+
+            let new_config = (app.mk_config)(&theme, &config)?;
+
+            fs::write(&path, new_config)?;
+
+            println!("{} {}", app.name, "\u{2713}");
+        }
+    }
+
+    Ok(())
 }
