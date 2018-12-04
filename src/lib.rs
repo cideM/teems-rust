@@ -8,6 +8,7 @@ use std::fmt;
 use std::fs;
 use std::path::PathBuf;
 
+// TODO: Create types.rs like Types.hs and move all types, traits, impl. there
 type Hex = String;
 
 pub trait Hexable {
