@@ -8,26 +8,24 @@ use std::fmt;
 use std::fs;
 use std::path::PathBuf;
 
-// TODO: Create types.rs like Types.hs and move all types, traits, impl. there
-type Hex = String;
-
-pub trait Hexable {
-    fn to_hex(&self) -> Hex;
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RGBA(u8, u8, u8, f32);
 
-impl Hexable for RGBA {
-    fn to_hex(&self) -> Hex {
+impl RGBA {
+    fn to_hex(&self) -> String {
         format!("#{:0>2x}{:0>2x}{:0>2x}", &self.0, &self.1, &self.2,)
     }
 }
 
+/*
+ * TODO: Implement deserialize for RGBA. use serde_json::Value to match on
+ * whether it's a string or an array. Return errors if array or string length
+ * is mismatched. Then parse both into RGBA for internal purposes.
+ * https://docs.serde.rs/serde_json/
+ */
+
 #[derive(Debug, Serialize, Deserialize)]
-pub enum ColorValue {
-    RGBA(RGBA),
-}
+pub struct ColorValue(RGBA);
 
 impl fmt::Display for ColorValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
