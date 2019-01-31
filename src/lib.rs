@@ -2,13 +2,19 @@ pub mod apps;
 
 use failure::Error;
 use failure_derive::Fail;
+use serde::de::{self, Deserialize, Deserializer};
 use serde_derive::{Deserialize, Serialize};
+use serde_json::{self};
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
+use std::num::ParseIntError;
 use std::path::PathBuf;
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, PartialEq)]
 pub struct RGBA(u8, u8, u8, f32);
 
 impl RGBA {
@@ -17,25 +23,41 @@ impl RGBA {
     }
 }
 
-/*
- * TODO: Implement deserialize for RGBA. use serde_json::Value to match on
- * whether it's a string or an array. Return errors if array or string length
- * is mismatched. Then parse both into RGBA for internal purposes.
- * https://docs.serde.rs/serde_json/
- */
+impl<'d> de::Deserialize<'d> for RGBA {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'d>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum RGBAHelper {
+            Str(String),
+            Array(u8, u8, u8, f32),
+        }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ColorValue(RGBA);
+        match Deserialize::deserialize(deserializer)? {
+            RGBAHelper::Str(str) => {
+                if str.len() != 7 {
+                    Err(de::Error::custom(
+                        "Hex color string must be of format #ABCDEF",
+                    ))
+                } else {
+                    // This only works on ASCII
+                    let rgb = &str[1..]
+                        .as_bytes()
+                        .chunks_exact(2)
+                        .map(|c| {
+                            let s = c.iter().map(|&byte| byte as char).collect::<String>();
+                            u8::from_str_radix(&s, 16)
+                        })
+                        .collect::<Result<Vec<u8>, ParseIntError>>()
+                        .map_err(de::Error::custom)?;
 
-impl fmt::Display for ColorValue {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut output = String::new();
-
-        match self {
-            ColorValue::RGBA(r) => output.push_str(&format!("{:?}", r)),
-        };
-
-        write!(f, "{}", output)
+                    Ok(RGBA(rgb[0], rgb[1], rgb[2], 1.0))
+                }
+            }
+            RGBAHelper::Array(r, g, b, alpha) => Ok(RGBA(r, g, b, alpha)),
+        }
     }
 }
 
@@ -43,10 +65,10 @@ type ColorName = String;
 
 type ThemeName = String;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Theme {
     pub name: ThemeName,
-    pub colors: HashMap<ColorName, ColorValue>,
+    pub colors: HashMap<ColorName, RGBA>,
 }
 
 impl fmt::Display for Theme {
@@ -56,8 +78,9 @@ impl fmt::Display for Theme {
         output.push_str(&format!("Name: {}\n", &self.name));
         output.push_str("Colors:\n");
 
+        // TODO: Implement display for RGBA
         for (color, value) in &self.colors {
-            output.push_str(&format!("\t: {}: {}", color, value));
+            output.push_str(&format!("\t: {:?}: {:?}", color, value));
         }
 
         output.push_str("\n");
@@ -95,7 +118,7 @@ impl App {
     }
 }
 
-pub fn list_themes(config: Config) -> () {
+pub fn list_themes(config: Config) {
     for theme in config {
         println!("{}", theme.name);
     }
@@ -126,9 +149,60 @@ pub fn activate_theme(apps: Vec<App>, theme: &Theme) -> Result<(), Error> {
 
             fs::write(&path, new_config)?;
 
-            println!("{} {}", app.name, "\u{2713}");
+            println!("{} \u{2713}", app.name);
         }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_parses_rgba_str() {
+        let s = r##"
+        {
+          "name": "foo",
+          "colors": {
+            "color1": "#FFAABB"
+          }
+        }"##;
+
+        let res: Theme = serde_json::from_str(&s).unwrap();
+        let mut colors = HashMap::new();
+
+        colors.insert(String::from("color1"), RGBA(255, 170, 187, 1.0));
+
+        let expect = Theme {
+            name: String::from("foo"),
+            colors,
+        };
+
+        assert_eq!(res, expect);
+    }
+
+    #[test]
+    fn it_parses_rgba_array() {
+        let s = r##"
+        {
+          "name": "foo",
+          "colors": {
+            "color1": [255, 170, 187, 1.0]
+          }
+        }"##;
+
+        let res: Theme = serde_json::from_str(&s).unwrap();
+        let mut colors = HashMap::new();
+
+        colors.insert(String::from("color1"), RGBA(255, 170, 187, 1.0));
+
+        let expect = Theme {
+            name: String::from("foo"),
+            colors,
+        };
+
+        assert_eq!(res, expect);
+    }
 }

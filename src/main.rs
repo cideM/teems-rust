@@ -4,19 +4,13 @@ use std::path::PathBuf;
 use teems_rust::{activate_theme, apps, list_themes, App as TermEmu, Theme};
 
 fn main() {
-    let x = TermEmu::new(
-        String::from("x"),
-        vec![PathBuf::from(r"Xresources.yml")],
-        Box::new(apps::x::convert_colors),
-    );
-
     let alacritty = TermEmu::new(
         String::from("alacritty"),
         vec![PathBuf::from(r"alacritty/alacritty.yml")],
         Box::new(apps::alacritty::convert_colors),
     );
 
-    let apps = vec![alacritty, x];
+    let apps = vec![alacritty];
 
     let app = App::new("Teems")
         .version(crate_version!())
