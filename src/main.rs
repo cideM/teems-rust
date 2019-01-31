@@ -10,7 +10,13 @@ fn main() {
         Box::new(apps::alacritty::convert_colors),
     );
 
-    let apps = vec![alacritty];
+    let x = TermEmu::new(
+        String::from("x"),
+        vec![PathBuf::from(r".Xresources")],
+        Box::new(apps::x::convert_colors),
+    );
+
+    let apps = vec![alacritty, x];
 
     let app = App::new("Teems")
         .version(crate_version!())

@@ -4,7 +4,7 @@ use failure::Error;
 use failure_derive::Fail;
 use serde::de::{self, Deserialize, Deserializer};
 use serde_derive::{Deserialize, Serialize};
-use serde_json::{self};
+use serde_json;
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
@@ -13,6 +13,10 @@ use std::path::PathBuf;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
+
+type ColorName = String;
+
+type ThemeName = String;
 
 #[derive(Debug, Serialize, PartialEq)]
 pub struct RGBA(u8, u8, u8, f32);
@@ -60,10 +64,6 @@ impl<'d> de::Deserialize<'d> for RGBA {
         }
     }
 }
-
-type ColorName = String;
-
-type ThemeName = String;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Theme {

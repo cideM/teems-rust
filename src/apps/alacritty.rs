@@ -78,7 +78,6 @@ pub fn convert_colors(theme: &Theme, app_config: &str) -> Result<String, Error> 
             mode = Mode::Normal;
         }
 
-        println!("{}", line.trim());
         if line.trim() == "cursor:" {
             results.push(line.to_owned());
         } else {
