@@ -78,9 +78,7 @@ pub fn convert_colors(theme: &Theme, app_config: &str) -> Result<String, Error> 
             mode = Mode::Normal;
         }
 
-        if line.trim() == "cursor:" {
-            results.push(line.to_owned());
-        } else {
+        if re_line_with_color.is_match(line) {
             let after = re_line_with_color
                 .replace_all(line, |caps: &Captures| {
                     let theme_color_name =
@@ -104,6 +102,8 @@ pub fn convert_colors(theme: &Theme, app_config: &str) -> Result<String, Error> 
                 .to_string();
 
             results.push(after);
+        } else {
+            results.push(line.to_owned());
         }
     }
 
