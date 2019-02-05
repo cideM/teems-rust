@@ -1,6 +1,5 @@
 use crate::Theme;
 use failure::Error;
-use regex::Captures;
 use regex::Regex;
 
 pub fn convert_colors(theme: &Theme, app_config: &str) -> Result<String, Error> {
@@ -12,32 +11,26 @@ pub fn convert_colors(theme: &Theme, app_config: &str) -> Result<String, Error> 
         (?P<color_name>color\d+
             |foreground
             |background)
-        (?P<middle>:\s*)
+        :\s*
         (?P<color_value>\#\w{6})
     ",
     )?;
 
     for line in app_config.lines() {
-        let after = re_line_with_color
-            .replace_all(line, |caps: &Captures| {
-                // This is a bit sloppy. I should really parse the xterm string case insensitively
-                // and just insert it here. But then I'd probably have to do it in JS and Haskell
-                // too... ~_~
-                format!(
-                    "XTerm*{}{}{}",
-                    &caps["color_name"],
-                    &caps["middle"],
-                    &theme
-                        .colors
-                        // Use existing color value if theme doesn't have a replacement
-                        .get(&caps["color_name"])
-                        .and_then(|c| Some(c.to_hex()))
-                        .unwrap_or_else(|| caps["color_value"].to_string())
-                )
-            })
-            .to_string();
+        if let Some(captures) = re_line_with_color.captures(line) {
+            let new_value = &theme
+                .colors
+                // Use existing color value if theme doesn't have a replacement
+                .get(&captures["color_name"])
+                .and_then(|c| Some(c.to_hex()))
+                .unwrap_or_else(|| captures["color_value"].to_string());
 
-        results.push(after);
+            let after = line.replace(&captures["color_value"], new_value);
+
+            results.push(after);
+        } else {
+            results.push(line.to_owned());
+        }
     }
 
     Ok(results.join("\n"))

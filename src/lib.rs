@@ -4,7 +4,6 @@ use failure::Error;
 use failure_derive::Fail;
 use serde::de::{self, Deserialize, Deserializer};
 use serde_derive::{Deserialize, Serialize};
-use serde_json;
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
@@ -13,6 +12,8 @@ use std::path::PathBuf;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
+
+// TODO: Error on color not found in theme
 
 type ColorName = String;
 

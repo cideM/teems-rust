@@ -7,11 +7,21 @@ pub fn convert_colors(theme: &Theme, app_config: &str) -> Result<String, Error> 
 
     let re_line_with_color = Regex::new(
         r"(?x)
-        ^\*.
+        ^\s*
         (?P<color_name>color\d+
             |foreground
-            |background)
-        :\s*
+            |background
+            |cursor
+            |url_color
+            |active_border_color
+            |inactive_border_color
+            |active_tab_foreground
+            |active_tab_background
+            |inactive_tab_foreground
+            |inactive_tab_background
+            |selection_foreground
+            |selection_background)
+        \s*
         (?P<color_value>\#\w{6})
     ",
     )?;
@@ -64,6 +74,8 @@ mod tests {
             (String::from("background"), RGBA(50, 50, 50, 1.0)),
             (String::from("cursor"), RGBA(60, 60, 60, 1.0)),
             (String::from("text"), RGBA(70, 70, 70, 1.0)),
+            (String::from("selection_foreground"), RGBA(70, 70, 70, 1.0)),
+            (String::from("selection_background"), RGBA(70, 70, 70, 1.0)),
         ]
         .into_iter()
         .collect();
@@ -79,45 +91,69 @@ mod tests {
         let theme = get_theme();
 
         let cfg = "
-*.foreground: #afb7c0
-*.background: #2c2d30
-*.color0: #2c2d30
-*.color8: #363a3e
-*.color1: #be868c
-*.color9: #be868c
-*.color2: #7f9d77
-*.color10: #7f9d77
-*.color3: #ab916d
-*.color11: #ab916d
-*.color4: #759abd
-*.color12: #759abd
-*.color5: #a88cb3
-*.color13: #a88cb3
-*.color6: #5da19f
-*.color14: #5da19f
-*.color7: #afb7c0
-*.color15: #cbd2d9
+# The foreground for selections
+selection_foreground #000000
+
+# The background for selections
+selection_background #FFFACD
+
+# The 16 terminal colors. There are 8 basic colors, each color has a dull and
+# bright version. You can also set the remaining colors from the 256 color table
+# as color16 to color256.
+
+# black
+color0 #1d1f21
+color8 #969896
+
+color1 #cc6666
+color9 #cc6666
+
+color2 #b5bd68
+color3 #f0c674
+color4 #81a2be
+color5 #b294bb
+color6 #8abeb7
+color7 #c5c8c6
+
+color10 #b5bd68
+color11 #f0c674
+color12 #81a2be
+color13 #b294bb
+color14 #8abeb7
+color15 #ffffff
         ";
 
         let cfg_expected = "
-*.foreground: #ffffff
-*.background: #323232
-*.color0: #000000
-*.color8: #080808
-*.color1: #010101
-*.color9: #090909
-*.color2: #020202
-*.color10: #0a0a0a
-*.color3: #030303
-*.color11: #0b0b0b
-*.color4: #040404
-*.color12: #0c0c0c
-*.color5: #050505
-*.color13: #0d0d0d
-*.color6: #060606
-*.color14: #0e0e0e
-*.color7: #070707
-*.color15: #0f0f0f
+# The foreground for selections
+selection_foreground #464646
+
+# The background for selections
+selection_background #464646
+
+# The 16 terminal colors. There are 8 basic colors, each color has a dull and
+# bright version. You can also set the remaining colors from the 256 color table
+# as color16 to color256.
+
+# black
+color0 #000000
+color8 #080808
+
+color1 #010101
+color9 #090909
+
+color2 #020202
+color3 #030303
+color4 #040404
+color5 #050505
+color6 #060606
+color7 #070707
+
+color10 #0a0a0a
+color11 #0b0b0b
+color12 #0c0c0c
+color13 #0d0d0d
+color14 #0e0e0e
+color15 #0f0f0f
         ";
 
         let result = convert_colors(&theme, &cfg).unwrap();

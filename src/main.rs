@@ -16,7 +16,25 @@ fn main() {
         Box::new(apps::x::convert_colors),
     );
 
-    let apps = vec![alacritty, x];
+    let xterm = TermEmu::new(
+        String::from("xterm"),
+        vec![PathBuf::from(r".Xresources")],
+        Box::new(apps::xterm::convert_colors),
+    );
+
+    let kitty = TermEmu::new(
+        String::from("kitty"),
+        vec![PathBuf::from(r".Xresources")],
+        Box::new(apps::kitty::convert_colors),
+    );
+
+    let termite = TermEmu::new(
+        String::from("termite"),
+        vec![PathBuf::from(r".Xresources")],
+        Box::new(apps::termite::convert_colors),
+    );
+
+    let apps = vec![alacritty, x, xterm, kitty, termite];
 
     let app = App::new("Teems")
         .version(crate_version!())

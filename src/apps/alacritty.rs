@@ -1,11 +1,15 @@
 use crate::Theme;
 use failure::Error;
-use regex::Captures;
 use regex::Regex;
 
-fn alacritty_color_to_theme_color<'a>(c: &'a str, mode: &Mode) -> &'a str {
+enum Mode {
+    Bright,
+    Normal,
+}
+
+fn get_theme_color<'a>(color: &'a str, mode: &Mode) -> &'a str {
     match mode {
-        Mode::Normal => match c {
+        Mode::Normal => match color {
             "black" => "color0",
             "red" => "color1",
             "green" => "color2",
@@ -20,7 +24,7 @@ fn alacritty_color_to_theme_color<'a>(c: &'a str, mode: &Mode) -> &'a str {
             "cursor" => "cursor",
             _ => "color0",
         },
-        Mode::Bright => match c {
+        Mode::Bright => match color {
             "black" => "color8",
             "red" => "color9",
             "green" => "color10",
@@ -38,16 +42,11 @@ fn alacritty_color_to_theme_color<'a>(c: &'a str, mode: &Mode) -> &'a str {
     }
 }
 
-enum Mode {
-    Bright,
-    Normal,
-}
-
 pub fn convert_colors(theme: &Theme, app_config: &str) -> Result<String, Error> {
     let re_line_with_color = Regex::new(
-        r"(?x)
+        r##"(?x)
             ^
-            (?P<leading>\s*)
+            \s*
             (?P<color_name>black
                 |red
                 |green
@@ -60,10 +59,11 @@ pub fn convert_colors(theme: &Theme, app_config: &str) -> Result<String, Error> 
                 |background
                 |cursor
                 |text)
-            (?P<middle>:\s*'0x)
+            :
+            \s*['"]0x
             (?P<color_value>\w{6})
-            (?P<trailing>'.*)
-        ",
+            ['"].*
+        "##,
     )?;
 
     let mut mode = Mode::Normal;
@@ -78,28 +78,18 @@ pub fn convert_colors(theme: &Theme, app_config: &str) -> Result<String, Error> 
             mode = Mode::Normal;
         }
 
-        if re_line_with_color.is_match(line) {
-            let after = re_line_with_color
-                .replace_all(line, |caps: &Captures| {
-                    let theme_color_name =
-                        alacritty_color_to_theme_color(&caps["color_name"], &mode);
+        if let Some(captures) = re_line_with_color.captures(line) {
+            let theme_color_name = get_theme_color(&captures["color_name"], &mode);
 
-                    format!(
-                        "{}{}{}{}{}",
-                        &caps["leading"],
-                        &caps["color_name"],
-                        &caps["middle"],
-                        &theme
-                            .colors
-                            // Use existing color value if theme doesn't have a replacement
-                            .get(theme_color_name)
-                            .and_then(|c| Some(c.to_hex()))
-                            .unwrap_or_else(|| caps["color_value"].to_string())
-                            .replace("#", ""),
-                        &caps["trailing"]
-                    )
-                })
-                .to_string();
+            let new_value = &theme
+                .colors
+                // Use existing color value if theme doesn't have a replacement
+                .get(theme_color_name)
+                .and_then(|c| Some(c.to_hex()))
+                .unwrap_or_else(|| captures["color_value"].to_string())
+                .replace("#", "");
+
+            let after = line.replace(&captures["color_value"], new_value);
 
             results.push(after);
         } else {
