@@ -2,9 +2,17 @@
 
 This is the rust implementation of my terminal colorscheme switcher application. It's a toy project I use to learn new languages. That doesn't mean you can't use it, it just might not support a lot of applications.
 
-## Supported Terminal Emulators
+* [Javascript (NodeJS)](https://github.com/cideM/teems)
+* [Bash/awk](https://github.com/cideM/teems-awk)
+* [Haskell](https://github.com/cideM/teems-haskell)
 
-- Alacritty
+  ## Supported Terminal Emulators
+
+* Alacritty
+* Kitty
+* X
+* XTerm
+* Termite
 
 ## Usage
 
@@ -28,9 +36,3 @@ SUBCOMMANDS:
     help        Prints this message or the help of the given subcommand(s)
     list        List all themes
 ```
-
-## Other Teems Implementations
-
-- [Javascript (NodeJS)](https://github.com/cideM/teems)
-- [Bash/awk](https://github.com/cideM/teems-awk)
-- [Haskell](https://github.com/cideM/teems-haskell)
